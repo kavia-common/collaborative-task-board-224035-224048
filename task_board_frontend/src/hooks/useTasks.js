@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { handleError } from "../utils/error";
 import { logger } from "../utils/logger";
+import { uid } from "../utils/helpers";
 
 // PUBLIC_INTERFACE
 export function useTasks(boardId) {
@@ -9,9 +10,69 @@ export function useTasks(boardId) {
   const [loading, setLoading] = useState(Boolean(supabase));
   const [error, setError] = useState("");
 
+  // Load tasks: Supabase or demo data
   useEffect(() => {
-    if (!supabase || !boardId) {
+    if (!boardId) {
       setTasks([]);
+      setLoading(false);
+      return;
+    }
+    if (!supabase) {
+      // Demo data (read-only)
+      setTasks([
+        {
+          id: uid("t"),
+          title: "Design board layout",
+          description: "",
+          status: "backlog",
+          order_index: 1000,
+          assignee_id: null,
+          labels: ["design"],
+          due_date: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          board_id: boardId,
+        },
+        {
+          id: uid("t"),
+          title: "Implement Kanban columns",
+          description: "",
+          status: "in_progress",
+          order_index: 1000,
+          assignee_id: null,
+          labels: ["frontend"],
+          due_date: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          board_id: boardId,
+        },
+        {
+          id: uid("t"),
+          title: "Wire Supabase Realtime",
+          description: "",
+          status: "review",
+          order_index: 1000,
+          assignee_id: null,
+          labels: ["backend"],
+          due_date: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          board_id: boardId,
+        },
+        {
+          id: uid("t"),
+          title: "Polish theme and styles",
+          description: "",
+          status: "done",
+          order_index: 1000,
+          assignee_id: null,
+          labels: ["ui"],
+          due_date: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          board_id: boardId,
+        },
+      ]);
       setLoading(false);
       return;
     }
@@ -41,10 +102,10 @@ export function useTasks(boardId) {
   }, [tasks]);
 
   const addTask = async (partial) => {
-    if (!supabase) return;
+    if (!supabase) return; // demo mode is read-only
     const order_index = (grouped[partial.status]?.length || 0) * 1000 + 1000;
     const optimistic = {
-      id: `tmp_${Date.now()}`,
+      id: uid("tmp"),
       title: partial.title || "New Task",
       description: partial.description || "",
       status: partial.status || "backlog",
@@ -68,7 +129,7 @@ export function useTasks(boardId) {
   };
 
   const updateTask = async (id, patch) => {
-    if (!supabase) return;
+    if (!supabase) return; // read-only demo
     const prev = tasks.find((t) => t.id === id);
     if (!prev) return;
     const optimistic = { ...prev, ...patch, updated_at: new Date().toISOString() };
@@ -77,7 +138,6 @@ export function useTasks(boardId) {
       const { error } = await supabase.from("tasks").update(patch).eq("id", id);
       if (error) throw error;
     } catch (e) {
-      // rollback
       setTasks((list) => list.map((t) => (t.id === id ? prev : t)));
       handleError(e, { scope: "useTasks.updateTask" });
     }
@@ -97,7 +157,6 @@ export function useTasks(boardId) {
   };
 
   const reorder = async ({ taskId, toStatus, newIndex }) => {
-    if (!supabase) return;
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
 
@@ -119,6 +178,12 @@ export function useTasks(boardId) {
       status: toStatus || task.status,
       order_index: newOrderIdx,
     };
+
+    if (!supabase) {
+      // demo local reorder
+      setTasks((list) => list.map((t) => (t.id === taskId ? { ...t, ...patch } : t)));
+      return;
+    }
 
     await updateTask(taskId, patch);
   };

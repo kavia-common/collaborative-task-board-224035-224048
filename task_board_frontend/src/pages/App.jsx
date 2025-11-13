@@ -2,10 +2,12 @@ import React, { useMemo, useState } from "react";
 import "../styles/theme.css";
 import TopNav from "../components/Layout/TopNav";
 import Sidebar from "../components/Layout/Sidebar";
-import KanbanBoard from "../components/Board/KanbanBoard";
 import SignIn from "../components/Auth/SignIn";
 import { useAppContext, AppProvider } from "../context/AppContext";
 import { supabase } from "../lib/supabaseClient";
+import TeamSidebar from "../components/TeamSidebar";
+import BoardPage from "./BoardPage";
+import { ToastProvider } from "../components/Toast";
 
 function SetupScreen() {
   const items = [
@@ -43,7 +45,7 @@ function SetupScreen() {
 }
 
 function AppInner() {
-  const { session } = useAppContext();
+  const { session, currentTeamId } = useAppContext();
   const [query, setQuery] = useState("");
 
   const content = useMemo(() => {
@@ -52,12 +54,13 @@ function AppInner() {
     return (
       <div className="layout">
         <Sidebar />
-        <main className="main">
-          <KanbanBoard />
-        </main>
+        <div style={{ display: "grid", gap: 12 }}>
+          <BoardPage />
+        </div>
+        <TeamSidebar teamId={currentTeamId} />
       </div>
     );
-  }, [session]);
+  }, [session, currentTeamId]);
 
   return (
     <div className="app-shell">
@@ -71,9 +74,11 @@ function AppInner() {
 export default function App() {
   return (
     <AppProvider>
-      <ErrorBoundary>
-        <AppInner />
-      </ErrorBoundary>
+      <ToastProvider>
+        <ErrorBoundary>
+          <AppInner />
+        </ErrorBoundary>
+      </ToastProvider>
     </AppProvider>
   );
 }

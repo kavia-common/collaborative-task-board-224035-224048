@@ -1,6 +1,6 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragOverlay } from "@dnd-kit/core";
-import { arrayMove, SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
+import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import Column from "./Column";
 import { useTasks } from "../../hooks/useTasks";
 import { useRealtimeTasks } from "../../hooks/useRealtimeTasks";
@@ -13,7 +13,7 @@ const COLUMNS = [
   { key: "done", title: "Done" },
 ];
 
-export default function KanbanBoard() {
+export default function KanbanBoard({ searchQuery = "", filters = {} }) {
   const { currentBoardId } = useAppContext();
   const { tasks, grouped, addTask, updateTask, deleteTask, reorder, setTasks } =
     useTasks(currentBoardId);
@@ -29,17 +29,33 @@ export default function KanbanBoard() {
       const taskId = String(active.id);
       const overId = String(over.id);
 
-      // overId is formatted as "col-<status>" or task id if using sortable lists.
       const overCol = overId.startsWith("col-") ? overId.replace("col-", "") : null;
 
       if (overCol) {
         const toStatus = overCol;
-        const newIndex = (grouped[toStatus]?.length || 0); // place at end for simplicity
+        const newIndex = (grouped[toStatus]?.length || 0);
         reorder({ taskId, toStatus, newIndex });
       }
     },
     [grouped, reorder]
   );
+
+  const filteredGrouped = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    const statusFilter = filters.status;
+    const assigneeFilter = filters.assignee;
+
+    const out = { backlog: [], in_progress: [], review: [], done: [] };
+    for (const col of Object.keys(grouped)) {
+      out[col] = (grouped[col] || []).filter((t) => {
+        if (statusFilter && t.status !== statusFilter) return false;
+        if (assigneeFilter && t.assignee_id !== assigneeFilter) return false;
+        if (q && !String(t.title || "").toLowerCase().includes(q)) return false;
+        return true;
+      });
+    }
+    return out;
+  }, [grouped, searchQuery, filters]);
 
   if (!currentBoardId) {
     return (
@@ -61,7 +77,7 @@ export default function KanbanBoard() {
               key={col.key}
               columnKey={col.key}
               title={col.title}
-              tasks={grouped[col.key] || []}
+              tasks={filteredGrouped[col.key] || []}
               onAdd={(p) => addTask({ ...p, board_id: currentBoardId })}
               onUpdate={updateTask}
               onDelete={deleteTask}
